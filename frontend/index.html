@@ -1,0 +1,57 @@
+<!-- File: index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEET AI MCQ Generator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container" id="app">
+    <!-- Step 1: Class Selection -->
+    <div class="step step-1 active">
+      <h2>Select Class</h2>
+      <button onclick="selectClass('11')">Class 11</button>
+      <button onclick="selectClass('12')">Class 12</button>
+    </div>
+
+    <!-- Step 2: Subject Selection -->
+    <div class="step step-2">
+      <h2>Select Subject</h2>
+      <button onclick="selectSubject('Physics')">Physics</button>
+      <button onclick="selectSubject('Chemistry')">Chemistry</button>
+      <button onclick="selectSubject('Botany')">Botany</button>
+      <button onclick="selectSubject('Zoology')">Zoology</button>
+      <button onclick="goBack(1)">⬅ Back</button>
+    </div>
+
+    <!-- Step 3: Chapter Selection -->
+    <div class="step step-3">
+      <h2>Select Chapter</h2>
+      <select id="chapterSelect"></select>
+      <button onclick="nextStep(4)">Next</button>
+      <button onclick="goBack(2)">⬅ Back</button>
+    </div>
+
+    <!-- Step 4: Topic Selection -->
+    <div class="step step-4">
+      <h2>Select Topic</h2>
+      <select id="topicSelect"></select>
+      <button onclick="generateMCQs()">Generate MCQs</button>
+      <button onclick="goBack(3)">⬅ Back</button>
+    </div>
+
+    <!-- Step 5: MCQ Display -->
+    <div class="step step-5">
+      <h2>Generated MCQs</h2>
+      <div id="mcqContainer"></div>
+      <button onclick="generateMore()">🔁 Generate More</button>
+      <button onclick="exportPDF()">📄 Export PDF</button>
+      <button onclick="goBack(4)">⬅ Back</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
