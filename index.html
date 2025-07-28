@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Escape </title>
+    <style>
+        /* --- GLOBAL STYLES & MINECRAFT FONT --- */
+        :root {
+            --bg-color: #87CEEB;
+            /* Sky Blue */
+            --wall-color: #4682B4;
+            /* Steel Blue */
+            --path-color: #F5DEB3;
+            /* Wheat */
+            --start-color: #98FB98;
+            /* Pale Green */
+            --exit-color: #FFD700;
+            /* Gold */
+            --player-color: #39FF14;
+            /* Neon Green */
+            --enemy-border: #FF4500;
+            /* OrangeRed */
+            --text-color: #FFFFFF;
+            --text-shadow-color: #3a3a3a;
+            --ui-bg: rgba(0, 0, 0, 0.4);
+            --font-family: 'Courier New', Courier, monospace;
+
+            --tile-size: min(6.2vw, 40px);
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: var(--font-family);
+            color: var(--text-color);
+            text-transform: uppercase;
+        }
+
+        .minecraft-text {
+            text-shadow: 2px 2px 0px var(--text-shadow-color);
+            letter-spacing: 1px;
+        }
+
+        /* --- GAME CONTAINER & EFFECTS --- */
+        .game-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .game-wrapper::after {
+            /* DANGER VIGNETTE */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            box-shadow: inset 0 0 0px 0px rgba(255, 0, 0, 0);
+            pointer-events: none;
+            transition: box-shadow 0.5s ease-out;
+            z-index: 99;
+        }
+
+        .game-wrapper.danger-close::after {
+            animation: pulseVignette 1.5s infinite;
+            box-shadow: inset 0 0 100px 30px rgba(255, 0, 0, 0.4);
+        }
+
+        @keyframes pulseVignette {
+            0% {
+                box-shadow: inset 0 0 100px 30px rgba(255, 0, 0, 0.4);
+            }
+
+            50% {
+                box-shadow: inset 0 0 100px 40px rgba(255, 0, 0, 0.6);
+            }
+
+            100% {
+                box-shadow: inset 0 0 100px 30px rgba(255, 0, 0, 0.4);
+            }
+        }
+
+        @keyframes screenShake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-3px);
+            }
+
+            50% {
+                transform: translateX(3px);
+            }
+
+            75% {
+                transform: translateX(-3px);
+            }
+        }
+
+        .screen-shake {
+            animation: screenShake 0.2s linear;
+        }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.4s ease, visibility 0.4s;
+            z-index: 100;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .screen h1 {
+            font-size: clamp(2rem, 10vw, 3.5rem);
+            margin-bottom: 15px;
+        }
+
+        .screen p {
+            font-size: clamp(0.9rem, 4vw, 1.1rem);
+            max-width: 500px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            text-transform: none;
+        }
+
+        .action-button {
+            font-family: var(--font-family);
+            padding: 15px 30px;
+            font-size: clamp(1rem, 5vw, 1.4rem);
+            color: var(--text-color);
+            background-color: var(--wall-color);
+            border: 2px solid var(--text-color);
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 4px 0px var(--text-shadow-color);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .action-button:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0px var(--text-shadow-color);
+        }
+
+        /* --- GAME UI & OVERLAYS --- */
+        .game-ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            background: var(--ui-bg);
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+            z-index: 50;
+        }
+
+        .ui-stat {
+            font-size: clamp(0.8rem, 3.5vw, 1rem);
+        }
+
+        .sir-shout-overlay {
+            position: absolute;
+            bottom: 200px;
+            /* Above D-Pad */
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 69, 0, 0.85);
+            padding: 10px 20px;
+            border-radius: var(--border-radius);
+            border: 2px solid var(--text-color);
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .sir-shout-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* --- MAZE BOARD --- */
+        .maze-board {
+            display: grid;
+            border: 3px solid #3a3a3a;
+            border-radius: 5px;
+            background-color: var(--path-color);
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .tile {
+            width: var(--tile-size);
+            height: var(--tile-size);
+        }
+
+        .wall {
+            background-color: var(--wall-color);
+            box-shadow: inset 2px 2px 0 #6a9ac1, inset -2px -2px 0 #2e5a7e;
+        }
+
+        .path {
+            background-color: var(--path-color);
+        }
+
+        .start {
+            background-color: var(--start-color);
+        }
+
+        .exit {
+            background-color: var(--exit-color);
+        }
+
+        .powerup {
+            background: radial-gradient(circle, #fff, #ff69b4);
+        }
+
+        .quiz-trap {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='%234682B4'%3E?%3C/text%3E%3C/svg%3E");
+            background-size: 60%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* --- PLAYER & ENEMY --- */
+        .character {
+            position: absolute;
+            width: var(--tile-size);
+            height: var(--tile-size);
+            border-radius: 50%;
+            background-size: cover;
+            background-position: center;
+            transition: transform 0.18s linear;
+            z-index: 10;
+            will-change: transform;
+        }
+
+        #player {
+            background-color: var(--player-color);
+            border: 3px solid #FFF;
+            box-sizing: border-box;
+        }
+
+        #enemy {
+            border: 3px solid var(--enemy-border);
+            box-sizing: border-box;
+            transition: transform 0.4s ease-in-out;
+        }
+
+        #enemy.frozen {
+            filter: hue-rotate(180deg) saturate(2);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        /* --- MOBILE CONTROLS (OVERLAY) --- */
+        .controls-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            width: 180px;
+            height: 180px;
+            gap: 8px;
+            z-index: 50;
+            opacity: 0.7;
+        }
+
+        .control-btn {
+            background-color: var(--ui-bg);
+            border: 2px solid var(--text-color);
+            border-radius: var(--border-radius);
+            font-size: 2.5rem;
+            color: var(--text-color);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .control-btn:active {
+            background-color: var(--text-color);
+            color: #333;
+        }
+
+        #up-btn {
+            grid-area: 1 / 2 / 2 / 3;
+        }
+
+        #left-btn {
+            grid-area: 2 / 1 / 3 / 2;
+        }
+
+        #down-btn {
+            grid-area: 3 / 2 / 4 / 3;
+        }
+
+        #right-btn {
+            grid-area: 2 / 3 / 3 / 4;
+        }
+
+        /* --- POP QUIZ MODAL --- */
+        #quiz-modal {
+            background-color: var(--path-color);
+            border: 4px solid var(--text-shadow-color);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            max-width: 90%;
+            width: 400px;
+            color: var(--text-shadow-color);
+        }
+
+        #quiz-question {
+            text-transform: none;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+
+        #quiz-answers {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .quiz-answer-btn {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="game-wrapper">
+        <div id="start-screen" class="screen">
+            <h1 class="minecraft-text">ESCAPE FROM OUR CUTIE
+                <p>He's faster, he's smarter, and he's not messing around. Use ARROW KEYS or the D-PAD. Can you escape
+                    the
+                    maze before naagu catches you?</p>
+                <button id="start-button" class="action-button minecraft-text">Start Game</button>
+        </div>
+        <div id="win-screen" class="screen hidden">
+            <h1 class="minecraft-text">YOU ESCAPED!</h1>
+            <p> You Won (nagu who ?)</p>
+            <button id="restart-button-win" class="action-button minecraft-text">Play Again</button>
+        </div>
+        <div id="lose-screen" class="screen hidden">
+            <img id="lose-image" src="" alt="Teacher's Face"
+                style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 5px solid var(--enemy-border); margin-bottom: 20px;">
+            <h1 class="minecraft-text">CAUGHT!</h1>
+            <p>"Yenoo herooo,jyaasti naatak madad illa !!"</p>
+            <button id="restart-button-lose" class="action-button minecraft-text">Try Again</button>
+        </div>
+        <div id="quiz-modal" class="screen hidden minecraft-text">
+            <h2>Questions</h2>
+            <p id="quiz-question">Question text goes here</p>
+            <div id="quiz-answers"></div>
+        </div>
+        <div class="game-content">
+            <div id="maze-board" class="maze-board"></div>
+        </div>
+        <div id="game-ui-overlay" class="game-ui-overlay minecraft-text hidden">
+            <div class="ui-stat">TIME: <span id="timer">0</span></div>
+            <div class="ui-stat">SIR'S DISTANCE: <span id="distance">--</span></div>
+        </div>
+        <div id="sir-shout-overlay" class="sir-shout-overlay minecraft-text"></div>
+        <div id="controls-overlay" class="controls-overlay hidden">
+            <button id="up-btn" class="control-btn">▲</button> <button id="left-btn" class="control-btn">◀</button>
+            <button id="down-btn" class="control-btn">▼</button> <button id="right-btn" class="control-btn">▶</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const TEACHER_IMAGE_URL = 'https://res.cloudinary.com/dfmhr0tu8/image/upload/v1747056126/2025-05-12T05-05-10.529Z_y5xefc.png';
+            const START_ENEMY_INTERVAL = 450;
+            const MIN_ENEMY_INTERVAL = 250;
+            const DIFFICULTY_INCREASE_INTERVAL = 15000; // 15 seconds
+            const POWERUP_DURATION = 5000;
+            const MAZE_WIDTH = 15, MAZE_HEIGHT = 15;
+            const DANGER_DISTANCE = 5;
+
+            const quizzes = [
+                { q: "Who is also called as golu 🎀", a: ["GOLULING", "ELON MUSK", "ALAKH PANDEY"], correct: 0 },
+                { q: "Who says beauty for no reason", a: ["SHiVUUUU", "Mukesh ambani", "GOTAM ADANI"], correct: 0 },
+                { q: "Kon sabse jyaada fekta hai", a: ["Uvs", "Uvs", "Uvs"], correct: 2 },
+                { q: "What is 15 * 3?", a: ["45", "30", "55"], correct: 0 }
+            ];
+
+            const sirShouts = ["Yenoo hero daadi yaar shave madkotar?", "Just 1 second bande", "HAHAHAHA ", "Line naag barti en illa ?", "Yenoooo heroo"];
+
+            const wrapper = document.querySelector('.game-wrapper');
+            const mazeBoard = document.getElementById('maze-board');
+            const allScreens = document.querySelectorAll('.screen');
+            const uiOverlay = document.getElementById('game-ui-overlay');
+            const controlsOverlay = document.getElementById('controls-overlay');
+            const timerEl = document.getElementById('timer');
+            const distanceEl = document.getElementById('distance');
+            const shoutEl = document.getElementById('sir-shout-overlay');
+            const quizModal = document.getElementById('quiz-modal');
+
+            let player, enemy, gameState = 'start', time = 0, tileSize = 0, intervals = {}, audioCtx;
+            let currentEnemyInterval = START_ENEMY_INTERVAL;
+            let mazeLayout = [];
+
+            function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+            function playSound(type, duration = 0.05, frequency = 440) {
+                if (!audioCtx) return;
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            }
+
+            function generateRandomMaze() {
+                // Initialize maze with all walls
+                mazeLayout = Array(MAZE_HEIGHT).fill().map(() => Array(MAZE_WIDTH).fill(1));
+
+                // Random starting position (top half of maze)
+                const startX = 1 + Math.floor(Math.random() * (MAZE_WIDTH - 2));
+                const startY = 1 + Math.floor(Math.random() * (Math.floor(MAZE_HEIGHT / 2) - 1));
+
+                // Random exit position (bottom half of maze)
+                let exitX, exitY;
+                do {
+                    exitX = 1 + Math.floor(Math.random() * (MAZE_WIDTH - 2));
+                    exitY = Math.floor(MAZE_HEIGHT / 2) + Math.floor(Math.random() * (Math.floor(MAZE_HEIGHT / 2) - 1));
+                } while (Math.abs(exitX - startX) < 5 && Math.abs(exitY - startY) < 5); // Ensure exit isn't too close
+
+                // Generate paths using randomized Prim's algorithm
+                let walls = [];
+                mazeLayout[startY][startX] = 'S';
+                player = { x: startX, y: startY };
+
+                // Add neighboring walls of starting position
+                addWallsToArray(startX, startY, walls);
+
+                while (walls.length > 0) {
+                    // Randomly select a wall
+                    const randomIndex = Math.floor(Math.random() * walls.length);
+                    const { x, y, px, py } = walls[randomIndex];
+                    walls.splice(randomIndex, 1);
+
+                    // If the cell on the opposite side isn't in the maze yet
+                    const oppositeX = x + (x - px);
+                    const oppositeY = y + (y - py);
+
+                    if (oppositeX > 0 && oppositeX < MAZE_WIDTH - 1 &&
+                        oppositeY > 0 && oppositeY < MAZE_HEIGHT - 1 &&
+                        mazeLayout[oppositeY][oppositeX] === 1) {
+
+                        // Make the wall a passage
+                        mazeLayout[y][x] = 0;
+
+                        // Add the opposite cell to the maze
+                        mazeLayout[oppositeY][oppositeX] = 0;
+
+                        // Add the neighboring walls of the opposite cell to the wall list
+                        addWallsToArray(oppositeX, oppositeY, walls);
+                    }
+                }
+
+                // Set exit
+                mazeLayout[exitY][exitX] = 'E';
+
+                // Place enemy at random position in bottom half
+                do {
+                    enemy = {
+                        x: 1 + Math.floor(Math.random() * (MAZE_WIDTH - 2)),
+                        y: Math.floor(MAZE_HEIGHT / 2) + Math.floor(Math.random() * (Math.floor(MAZE_HEIGHT / 2) - 1))
+                    };
+                } while (mazeLayout[enemy.y][enemy.x] !== 0 ||
+                    (Math.abs(enemy.x - startX) < 3 && Math.abs(enemy.y - startY) < 3));
+
+                // Add some powerups and quiz traps (5-8 of each)
+                const numPowerups = 5 + Math.floor(Math.random() * 4);
+                const numQuizTraps = 5 + Math.floor(Math.random() * 4);
+
+                placeRandomItems('P', numPowerups);
+                placeRandomItems('Q', numQuizTraps);
+
+                // Ensure there's always a path from start to exit
+                ensurePathToExit(startX, startY, exitX, exitY);
+            }
+
+            function addWallsToArray(x, y, walls) {
+                const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+                directions.forEach(([dx, dy]) => {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx > 0 && nx < MAZE_WIDTH - 1 && ny > 0 && ny < MAZE_HEIGHT - 1 && mazeLayout[ny][nx] === 1) {
+                        walls.push({ x: nx, y: ny, px: x, py: y });
+                    }
+                });
+            }
+
+            function placeRandomItems(type, count) {
+                let placed = 0;
+                while (placed < count) {
+                    const x = 1 + Math.floor(Math.random() * (MAZE_WIDTH - 2));
+                    const y = 1 + Math.floor(Math.random() * (MAZE_HEIGHT - 2));
+
+                    if (mazeLayout[y][x] === 0 &&
+                        !(x === player.x && y === player.y) &&
+                        !(x === enemy.x && y === enemy.y)) {
+                        mazeLayout[y][x] = type;
+                        placed++;
+                    }
+                }
+            }
+
+            function ensurePathToExit(startX, startY, exitX, exitY) {
+                const path = findPathBFS({ x: startX, y: startY }, { x: exitX, y: exitY });
+                if (!path) {
+                    // If no path, create one by removing walls along a direct path
+                    let x = startX, y = startY;
+                    while (x !== exitX || y !== exitY) {
+                        if (x < exitX) x++;
+                        else if (x > exitX) x--;
+                        else if (y < exitY) y++;
+                        else if (y > exitY) y--;
+
+                        if (mazeLayout[y][x] === 1) {
+                            mazeLayout[y][x] = 0;
+                        }
+                    }
+                }
+            }
+
+            function generateMaze() {
+                generateRandomMaze();
+                mazeBoard.innerHTML = '';
+                mazeBoard.style.gridTemplateColumns = `repeat(${MAZE_WIDTH}, 1fr)`;
+                mazeLayout.forEach((row, y) => row.forEach((tileType, x) => {
+                    const tile = document.createElement('div');
+                    tile.classList.add('tile');
+                    switch (tileType) {
+                        case 1: tile.classList.add('wall'); break;
+                        case 'S':
+                            tile.classList.add('start');
+                            player = { x, y };
+                            break;
+                        case 'E': tile.classList.add('exit'); break;
+                        case 'P': tile.classList.add('powerup'); break;
+                        case 'Q': tile.classList.add('quiz-trap'); break;
+                        default: tile.classList.add('path');
+                    }
+                    mazeBoard.appendChild(tile);
+                }));
+                const firstTile = mazeBoard.querySelector('.tile');
+                if (firstTile) tileSize = firstTile.offsetWidth;
+            }
+
+            function createCharacters() {
+                document.getElementById('player')?.remove();
+                document.getElementById('enemy')?.remove();
+                const playerEl = document.createElement('div');
+                playerEl.id = 'player';
+                playerEl.className = 'character';
+                const enemyEl = document.createElement('div');
+                enemyEl.id = 'enemy';
+                enemyEl.className = 'character';
+                enemyEl.style.backgroundImage = `url(${TEACHER_IMAGE_URL})`;
+                mazeBoard.appendChild(playerEl);
+                mazeBoard.appendChild(enemyEl);
+                updateCharacterPosition('player', player.x, player.y);
+                updateCharacterPosition('enemy', enemy.x, enemy.y);
+            }
+
+            function updateCharacterPosition(id, x, y) {
+                const el = document.getElementById(id);
+                if (el) el.style.transform = `translate(${x * tileSize}px, ${y * tileSize}px)`;
+            }
+
+            function startGame() {
+                initAudio();
+                gameState = 'playing';
+                currentEnemyInterval = START_ENEMY_INTERVAL;
+                time = 0;
+                allScreens.forEach(s => s.classList.add('hidden'));
+                uiOverlay.classList.remove('hidden');
+                controlsOverlay.classList.remove('hidden');
+                generateMaze();
+                createCharacters();
+
+                Object.values(intervals).forEach(clearInterval);
+                intervals.timer = setInterval(() => { if (gameState === 'playing') timerEl.textContent = ++time; }, 1000);
+                startEnemyMovement();
+                intervals.shout = setInterval(sirShout, 8000);
+                intervals.difficulty = setInterval(increaseDifficulty, DIFFICULTY_INCREASE_INTERVAL);
+                updateUI();
+            }
+
+            function increaseDifficulty() {
+                if (gameState !== 'playing') return;
+                currentEnemyInterval = Math.max(MIN_ENEMY_INTERVAL, currentEnemyInterval - 25);
+                startEnemyMovement();
+            }
+
+            function startEnemyMovement() {
+                if (intervals.enemy) clearInterval(intervals.enemy);
+                intervals.enemy = setInterval(moveEnemy, currentEnemyInterval);
+            }
+
+            function movePlayer(dx, dy) {
+                if (gameState !== 'playing') return;
+                const newX = player.x + dx;
+                const newY = player.y + dy;
+                if (isWalkable(newX, newY)) {
+                    player.x = newX;
+                    player.y = newY;
+                    playSound('square', 0.05, 600);
+                    wrapper.classList.add('screen-shake');
+                    setTimeout(() => wrapper.classList.remove('screen-shake'), 200);
+                    updateCharacterPosition('player', player.x, player.y);
+                    checkGameState();
+                    updateUI();
+                }
+            }
+
+            // --- BFS PATHFINDING AI ---
+            function findPathBFS(start, end) {
+                const queue = [[start]];
+                const visited = new Set([`${start.x},${start.y}`]);
+                while (queue.length > 0) {
+                    const path = queue.shift();
+                    const { x, y } = path[path.length - 1];
+                    if (x === end.x && y === end.y) return path;
+                    const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                    for (const [dx, dy] of neighbors) {
+                        const nextX = x + dx, nextY = y + dy;
+                        if (isWalkable(nextX, nextY) && !visited.has(`${nextX},${nextY}`)) {
+                            visited.add(`${nextX},${nextY}`);
+                            const newPath = [...path, { x: nextX, y: nextY }];
+                            queue.push(newPath);
+                        }
+                    }
+                }
+                return null; // No path found
+            }
+
+            function moveEnemy() {
+                if (gameState !== 'playing') return;
+                const path = findPathBFS(enemy, player);
+                if (path && path.length > 1) {
+                    enemy.x = path[1].x;
+                    enemy.y = path[1].y;
+                    updateCharacterPosition('enemy', enemy.x, enemy.y);
+                    checkGameState();
+                    updateUI();
+                }
+            }
+
+            function isWalkable(x, y) {
+                return x >= 0 && x < MAZE_WIDTH && y >= 0 && y < MAZE_HEIGHT && mazeLayout[y][x] !== 1;
+            }
+
+            function checkGameState() {
+                const currentTileSymbol = mazeLayout[player.y][player.x];
+                const currentTileDOM = mazeBoard.children[player.y * MAZE_WIDTH + player.x];
+                if (currentTileSymbol === 'P') {
+                    freezeEnemy();
+                    mazeLayout[player.y][player.x] = 0;
+                    currentTileDOM.classList.remove('powerup');
+                } else if (currentTileSymbol === 'Q') {
+                    triggerQuiz();
+                    mazeLayout[player.y][player.x] = 0;
+                    currentTileDOM.classList.remove('quiz-trap');
+                }
+                if (player.x === enemy.x && player.y === enemy.y) endGame(false);
+                else if (currentTileSymbol === 'E') endGame(true);
+            }
+
+            function updateUI() {
+                if (gameState === 'end') return;
+                const distance = Math.abs(player.x - enemy.x) + Math.abs(player.y - enemy.y);
+                distanceEl.textContent = distance;
+                wrapper.classList.toggle('danger-close', distance <= DANGER_DISTANCE);
+            }
+
+            function endGame(isWin) {
+                gameState = 'end';
+                Object.values(intervals).forEach(clearInterval);
+                uiOverlay.classList.add('hidden');
+                controlsOverlay.classList.add('hidden');
+                wrapper.classList.remove('danger-close');
+                if (isWin) {
+                    playSound('sawtooth', 0.5, 880);
+                    document.getElementById('win-screen').classList.remove('hidden');
+                } else {
+                    playSound('sawtooth', 0.5, 220);
+                    document.getElementById('lose-image').src = TEACHER_IMAGE_URL;
+                    document.getElementById('lose-screen').classList.remove('hidden');
+                }
+            }
+
+            function sirShout() {
+                if (gameState !== 'playing') return;
+                shoutEl.textContent = sirShouts[Math.floor(Math.random() * sirShouts.length)];
+                shoutEl.classList.add('visible');
+                setTimeout(() => shoutEl.classList.remove('visible'), 2000);
+            }
+
+            function freezeEnemy() {
+                playSound('sine', 0.3, 1000);
+                const enemyEl = document.getElementById('enemy');
+                clearInterval(intervals.enemy);
+                enemyEl.classList.add('frozen');
+                setTimeout(() => {
+                    if (gameState === 'playing') {
+                        startEnemyMovement();
+                        enemyEl.classList.remove('frozen');
+                    }
+                }, POWERUP_DURATION);
+            }
+
+            function triggerQuiz() {
+                gameState = 'paused';
+                playSound('square', 0.1, 300);
+                const quiz = quizzes[Math.floor(Math.random() * quizzes.length)];
+                document.getElementById('quiz-question').textContent = quiz.q;
+                const answersContainer = document.getElementById('quiz-answers');
+                answersContainer.innerHTML = '';
+                quiz.a.forEach((answer, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'action-button quiz-answer-btn minecraft-text';
+                    btn.textContent = answer;
+                    btn.onclick = () => handleQuizAnswer(index === quiz.correct);
+                    answersContainer.appendChild(btn);
+                });
+                quizModal.classList.remove('hidden');
+            }
+
+            function handleQuizAnswer(isCorrect) {
+                quizModal.classList.add('hidden');
+                if (isCorrect) {
+                    playSound('square', 0.2, 800);
+                    gameState = 'playing';
+                } else {
+                    playSound('sawtooth', 0.3, 150);
+                    playerFreeze(3000);
+                }
+            }
+
+            function playerFreeze(duration) {
+                const playerEl = document.getElementById('player');
+                playerEl.style.backgroundColor = '#ADD8E6';
+                gameState = 'paused';
+                setTimeout(() => {
+                    playerEl.style.backgroundColor = 'var(--player-color)';
+                    if (gameState !== 'end') gameState = 'playing';
+                }, duration);
+            }
+
+            function handleKeyPress(e) {
+                if (gameState !== 'playing') return;
+                e.preventDefault();
+                switch (e.key) {
+                    case 'ArrowUp': case 'w': movePlayer(0, -1); break;
+                    case 'ArrowDown': case 's': movePlayer(0, 1); break;
+                    case 'ArrowLeft': case 'a': movePlayer(-1, 0); break;
+                    case 'ArrowRight': case 'd': movePlayer(1, 0); break;
+                }
+            }
+
+            window.addEventListener('keydown', handleKeyPress);
+            document.getElementById('up-btn').addEventListener('click', () => movePlayer(0, -1));
+            document.getElementById('down-btn').addEventListener('click', () => movePlayer(0, 1));
+            document.getElementById('left-btn').addEventListener('click', () => movePlayer(-1, 0));
+            document.getElementById('right-btn').addEventListener('click', () => movePlayer(1, 0));
+            document.getElementById('start-button').addEventListener('click', startGame);
+            document.getElementById('restart-button-win').addEventListener('click', startGame);
+            document.getElementById('restart-button-lose').addEventListener('click', startGame);
+            window.addEventListener('resize', () => {
+                if (gameState !== 'start') {
+                    const firstTile = mazeBoard.querySelector('.tile');
+                    if (firstTile) {
+                        tileSize = firstTile.offsetWidth;
+                        updateCharacterPosition('player', player.x, player.y);
+                        updateCharacterPosition('enemy', enemy.x, enemy.y);
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
